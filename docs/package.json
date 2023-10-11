@@ -1,6 +1,6 @@
 {
   "name": "@txikijs/types",
-  "description": "",
+  "description": "Typescript types for the txikijs runtime",
   "main": "",
   "types": "types/index.d.ts",
   "keywords": [
