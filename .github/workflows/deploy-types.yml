@@ -11,12 +11,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          registry-url: https://registry.npmjs.org/
       - name: Publish package
         working-directory: ./docs
         # ensure that the version of the tag is used for publishing
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc-publish
-          cat .npmrc-publish
           npm version ${GITHUB_REF_NAME#v}
           NPM_CONFIG_USERCONFIG="./.npmrc-publish" npm publish  --registry "https://registry.npmjs.org"
         env:
