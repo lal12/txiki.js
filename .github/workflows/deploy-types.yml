@@ -19,7 +19,7 @@ jobs:
         working-directory: ./docs
         # ensure that the version of the tag is used for publishing
         run: |
-          find ..
+          npm config get registry
           npm version ${GITHUB_REF_NAME#v}
           npm publish
         env:
