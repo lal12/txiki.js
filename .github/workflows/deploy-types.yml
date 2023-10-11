@@ -15,8 +15,9 @@ jobs:
         working-directory: ./docs
         # ensure that the version of the tag is used for publishing
         run: |
-          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > .npmrc-publish
+          cat .npmrc-publish
           npm version ${GITHUB_REF_NAME#v}
-          npm publish
+          NPM_CONFIG_USERCONFIG="./.npmrc-publish" npm publish  --registry "https://registry.npmjs.org"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
