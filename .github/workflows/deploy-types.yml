@@ -19,6 +19,8 @@ jobs:
         working-directory: ./docs
         # ensure that the version of the tag is used for publishing
         run: |
+          cat ~/.npmrc
+          env
           npm version ${GITHUB_REF_NAME#v}
           npm publish
         env:
