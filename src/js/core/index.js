@@ -36,6 +36,7 @@ const noExport = [
     'ffi_load_native',
     'guessHandle',
     'isStdinTty',
+    'lws_load_native',
     'mkdir',
     'mkstemp',
     'newStdioFile',

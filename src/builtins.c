@@ -26,6 +26,7 @@
 #include "bundles/c/stdlib/ffi.c"
 #include "bundles/c/stdlib/getopts.c"
 #include "bundles/c/stdlib/hashing.c"
+#include "bundles/c/stdlib/http-server.c"
 #include "bundles/c/stdlib/ipaddr.c"
 #include "bundles/c/stdlib/path.c"
 #include "bundles/c/stdlib/sqlite.c"
@@ -42,6 +43,7 @@ typedef struct {
 static tjs_builtin_t builtins[] = {
     { "tjs:assert", tjs__assert, tjs__assert_size },
     { "tjs:ffi", tjs__ffi, tjs__ffi_size },
+    { "tjs:http", tjs__http_server, tjs__http_server_size },
     { "tjs:getopts", tjs__getopts, tjs__getopts_size },
     { "tjs:hashing", tjs__hashing, tjs__hashing_size },
     { "tjs:ipaddr", tjs__ipaddr, tjs__ipaddr_size },

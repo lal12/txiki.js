@@ -54,6 +54,23 @@ add_subdirectory(deps/libuv EXCLUDE_FROM_ALL)
 
 add_subdirectory(deps/sqlite3 EXCLUDE_FROM_ALL)
 
+
+if(CMAKE_BUILD_TYPE EQUAL "Release")
+    option(LWS_WITH_NO_LOGS "" ON)
+else()
+    option(LWS_WITH_NO_LOGS "" OFF)
+endif()
+set(LWS_WITH_LIBUV ON)
+set(LWS_WITH_SERVER ON)
+set(LWS_WITH_SHARED "" OFF)
+set(LWS_WITHOUT_CLIENT "" ON) # for now no client part is used, probably will change in the future
+#option(LWS_WITHOUT_TESTAPPS "" ON)
+#option(LWS_WITHOUT_TEST_SERVER "" ON)
+#option(LWS_WITH_NETLINK "" OFF) # TODO check if this is useful
+#option(LWS_WITH_UDP "" OFF) # TODO check if this is useful
+add_subdirectory(deps/libwebsockets EXCLUDE_FROM_ALL)
+
+
 set(BUILD_WASI "simple" CACHE STRING "WASI implementation")
 add_subdirectory(deps/wasm3 EXCLUDE_FROM_ALL)
 
@@ -79,6 +96,7 @@ add_executable(tjs
     src/ffi.c
     src/fs.c
     src/fswatch.c
+    src/http-server.c
     src/modules.c
     src/os.c
     src/process.c
@@ -150,7 +168,7 @@ string(TOLOWER ${CMAKE_SYSTEM_NAME} TJS_PLATFORM)
 target_compile_options(tjs PRIVATE ${tjs_cflags})
 target_compile_definitions(tjs PRIVATE TJS__PLATFORM="${TJS_PLATFORM}")
 target_include_directories(tjs PRIVATE ${CURL_INCLUDE_DIRS})
-target_link_libraries(tjs qjs uv_a m3 sqlite3 m pthread ${CURL_LIBRARIES})
+target_link_libraries(tjs qjs uv_a m3 sqlite3 m pthread ${CURL_LIBRARIES} websockets)
 
 if (BUILD_WITH_MIMALLOC)
     target_compile_definitions(tjs PRIVATE TJS__HAS_MIMALLOC)

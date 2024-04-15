@@ -161,6 +161,7 @@ static void tjs__bootstrap_core(JSContext *ctx, JSValue ns) {
     tjs__mod_ffi_init(ctx, ns);
     tjs__mod_fs_init(ctx, ns);
     tjs__mod_fswatch_init(ctx, ns);
+    tjs__mod_lws_init(ctx, ns);
     tjs__mod_os_init(ctx, ns);
     tjs__mod_process_init(ctx, ns);
     tjs__mod_signals_init(ctx, ns);
