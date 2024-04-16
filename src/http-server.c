@@ -44,8 +44,8 @@ typedef struct {
 } tjs_lws_ctx;
 
 static void free_queue(JSContext* ctx, js_alloc_t** start){
-    js_alloc_t* ptr = *start;
-    while(ptr){
+    while(*start){
+        js_alloc_t* ptr = *start;
         js_alloc_t* next = ptr->next;
         switch(ptr->type){
             case 's':
@@ -59,9 +59,8 @@ static void free_queue(JSContext* ctx, js_alloc_t** start){
                 break;
         }
         js_free(ctx, ptr);
-        ptr = next;
+        *start = next;
     }
-    *start = NULL;
 }
 
 static void mark_queue(JSRuntime* rt, js_alloc_t** start, JS_MarkFunc* mark_func){
@@ -108,27 +107,23 @@ static void* add_ptr_to_queue(JSContext* ctx, js_alloc_t** start, void* ptr){
 static JSClassID tjs_lws_ctx_class_id;
 
 static int js_lws_callback(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len){
-    JSValue* cb_js = user;
+    printf("called js_lws_callback, reason %d\n", reason);
+	switch(reason){
+		case LWS_CALLBACK_PROTOCOL_INIT:
+			return 0;
+	}
+	JSValue* cb_js = user;
     tjs_lws_ctx* lws_h = lws_get_opaque_user_data(wsi);
     JSContext* ctx = lws_h->js_ctx;
+
     JSValueConst args[2];
     args[0] = JS_NewInt32(ctx, reason);
     args[1] = JS_NewArrayBufferCopy(ctx, in, len);
     JSValue ret = JS_Call(ctx, *cb_js, JS_UNDEFINED, 3, args);
     JS_FreeValue(ctx, args[0]);
     JS_FreeValue(ctx, args[1]);
-    if(JS_IsException(ret)){
-        JSValue exception_val = JS_GetException(ctx);
-        JSValue exception_str = JS_ToString(ctx, exception_val);
-        const char* exception_cstr = JS_ToCString(ctx, exception_str);
-        fprintf(stderr, "Exception: %s\n", exception_cstr);
-        JS_FreeCString(ctx, exception_cstr);
-        JS_FreeValue(ctx, exception_str);
-        JS_FreeValue(ctx, exception_val);
-    }
     JS_FreeValue(ctx, ret);
-    return 0;
-
+    return lws_callback_http_dummy(wsi, reason, user, in, len);
 }
 
 static JSValue tjs_mod_lws_create_ctx(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -151,6 +146,7 @@ static JSValue tjs_mod_lws_create_ctx(JSContext *ctx, JSValueConst this_val, int
 
     JSValue ret = JS_NewObjectClass(ctx, tjs_lws_ctx_class_id);
     JS_SetOpaque(ret, lws);
+
     return ret;
 }
 
@@ -223,7 +219,7 @@ static JSValue tjs_mod_lws_add_vhost(JSContext *ctx, JSValueConst this_val, int 
             JSValue name = JS_GetPropertyStr(ctx, proto, "name");
             JSValue callback = JS_GetPropertyStr(ctx, proto, "callback");
             JS_FreeValue(ctx, proto);
-            error = error || !JS_IsString(name) || !JS_IsFunction(ctx, callback);
+            error = error || !JS_IsString(name);
             if(error){
                 JS_ThrowTypeError(ctx, "Expected object with name and callback properties in array in arg #2");
                 js_free(ctx, protos);
@@ -231,12 +227,17 @@ static JSValue tjs_mod_lws_add_vhost(JSContext *ctx, JSValueConst this_val, int 
             }else{
                 const char* name_cstr = JS_ToCString(ctx, name);
                 add_cstr_to_queue(ctx, &init_alloc, name_cstr);
-                struct lws_protocols* lws_proto = js_malloc(ctx, sizeof(struct lws_protocols));
+                struct lws_protocols* lws_proto = js_mallocz(ctx, sizeof(struct lws_protocols));
                 add_ptr_to_queue(ctx, &init_alloc, lws_proto);
                 protos[i] = lws_proto;
                 lws_proto->name = name_cstr;
-                lws_proto->callback = js_lws_callback;
-                lws_proto->user = add_jsv_to_queue(ctx, &lws->deps, callback);
+                if(JS_IsFunction(ctx, callback)){
+                    lws_proto->callback = js_lws_callback;
+                    lws_proto->user = add_jsv_to_queue(ctx, &lws->deps, callback);
+                }else{
+                    lws_proto->callback = lws_callback_http_dummy;
+                
+                }
             }
             JS_FreeValue(ctx, name);
             if(error){
@@ -256,10 +257,8 @@ static JSValue tjs_mod_lws_add_vhost(JSContext *ctx, JSValueConst this_val, int 
         JSValue arrlen_js = JS_GetPropertyStr(ctx, argv[2], "length");
         JS_ToInt32(ctx, &arrlen, arrlen_js);
         JS_FreeValue(ctx, arrlen_js);
-        printf("arrlen %d", arrlen);
         if(arrlen == 0){
             JS_ThrowRangeError(ctx, "Expected array in arg #3 to be non-empty");
-            printf("arrlen %d", arrlen);
             error = true;
             goto end;
         }
@@ -292,13 +291,24 @@ static JSValue tjs_mod_lws_add_vhost(JSContext *ctx, JSValueConst this_val, int 
             JS_FreeValue(ctx, prop);
 
             prop = JS_GetPropertyStr(ctx, proto, "origin");
-            if(!JS_IsString(prop)){
-                JS_ThrowTypeError(ctx, "Expected string origin property in array in arg #3");
-                error = true;
-                goto cleanup;
+            if(JS_IsString(prop)){
+                mountNew->origin = JS_ToCString(ctx, prop);
+                add_cstr_to_queue(ctx, &init_alloc, mountNew->def);
             }
-            mountNew->origin = JS_ToCString(ctx, prop);
-            add_cstr_to_queue(ctx, &init_alloc, mountNew->origin);
+            JS_FreeValue(ctx, prop);
+
+            prop = JS_GetPropertyStr(ctx, proto, "def");
+            if(JS_IsString(prop)){
+                mountNew->def = JS_ToCString(ctx, prop);
+                add_cstr_to_queue(ctx, &init_alloc, mountNew->def);
+            }
+            JS_FreeValue(ctx, prop);
+
+            prop = JS_GetPropertyStr(ctx, proto, "protocol");
+            if(JS_IsString(prop)){
+                mountNew->protocol = JS_ToCString(ctx, prop);
+                add_cstr_to_queue(ctx, &init_alloc, mountNew->def);
+            }
             JS_FreeValue(ctx, prop);
 
             prop = JS_GetPropertyStr(ctx, proto, "origin_protocol");
@@ -327,9 +337,11 @@ static JSValue tjs_mod_lws_add_vhost(JSContext *ctx, JSValueConst this_val, int 
         memset( &info, 0, sizeof(info) );
         info.port = port;
         info.vhost_name = vhost_name;
-        info.options = LWS_SERVER_OPTION_LIBUV;
-        info.pprotocols = protos;
+        info.options = LWS_SERVER_OPTION_EXPLICIT_VHOSTS;
+		info.pcontext = &lws->lws_ctx;
+    	info.pprotocols = protos;
         info.mounts = mountFirst;
+        //info.vhost_name = "http";
         struct lws_vhost* vh = lws_create_vhost(lws->lws_ctx, &info);
         if(!vh){
             JS_ThrowInternalError(ctx, "Failed to create vhost");
@@ -339,12 +351,12 @@ static JSValue tjs_mod_lws_add_vhost(JSContext *ctx, JSValueConst this_val, int 
 
 end:
 
-    free_queue(ctx, &init_alloc);
+    //free_queue(ctx, &init_alloc);
 
     printf("end %d\n", error);
     if(error){
-        js_free(ctx, lws);
         free_queue(ctx, &lws->deps);
+        js_free(ctx, lws);
         return JS_EXCEPTION;
     }
 
@@ -363,6 +375,7 @@ static void js_lws_ctx_finalizer(JSRuntime *rt, JSValue val) {
     if (u) {
         if(u->lws_ctx){
             lws_context_destroy(u->lws_ctx);
+			u->lws_ctx = NULL;
         }
         free_queue(u->js_ctx, &u->deps);
         js_free_rt(rt, u);
@@ -373,6 +386,18 @@ JSClassDef tjs_lws_ctx_class = { "LWSContext", .finalizer = js_lws_ctx_finalizer
 
 static const JSCFunctionListEntry tjs_lws_ctx_proto_funcs[] = {
     TJS_CFUNC_DEF("add_vhost", 3, tjs_mod_lws_add_vhost)
+};
+
+#define TJS_CONST_STRING_DEF(x) JS_PROP_INT32_DEF(#x, x, JS_PROP_ENUMERABLE)
+
+static const JSCFunctionListEntry tjs_lws_protocol_types[] = {
+    JS_PROP_INT32_DEF("HTTP", LWSMPRO_HTTP, JS_PROP_ENUMERABLE),
+    JS_PROP_INT32_DEF("HTTPS", LWSMPRO_HTTPS, JS_PROP_ENUMERABLE),
+    JS_PROP_INT32_DEF("FILE", LWSMPRO_FILE, JS_PROP_ENUMERABLE),
+    JS_PROP_INT32_DEF("CGI", LWSMPRO_CGI, JS_PROP_ENUMERABLE),
+    JS_PROP_INT32_DEF("REDIR_HTTP", LWSMPRO_REDIR_HTTP, JS_PROP_ENUMERABLE),
+    JS_PROP_INT32_DEF("REDIR_HTTPS", LWSMPRO_REDIR_HTTPS, JS_PROP_ENUMERABLE),
+    JS_PROP_INT32_DEF("CALLBACK", LWSMPRO_CALLBACK, JS_PROP_ENUMERABLE),
 };
 
 static JSValue tjs_lws_load_native(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -386,10 +411,16 @@ static JSValue tjs_lws_load_native(JSContext *ctx, JSValueConst this_val, int ar
     JSValue tjs_lws_ctx_constructor = JS_NewCFunction2(ctx, tjs_mod_lws_create_ctx, tjs_lws_ctx_class.class_name, 1, JS_CFUNC_constructor, 0);
     JS_DefinePropertyValueStr(ctx, lwsobj, tjs_lws_ctx_class.class_name, tjs_lws_ctx_constructor, JS_PROP_CONFIGURABLE | JS_PROP_WRITABLE | JS_PROP_ENUMERABLE);
 
+    JSValue protocol_types = JS_NewObject(ctx);
+    JS_SetPropertyFunctionList(ctx, protocol_types, tjs_lws_protocol_types, countof(tjs_lws_protocol_types));
+    JS_SetPropertyStr(ctx, lwsobj, "protocol_types", protocol_types);
+
     return lwsobj;
 }
 
 void tjs__mod_lws_init(JSContext *ctx, JSValue ns) {
     JSValue func = JS_NewCFunction(ctx, tjs_lws_load_native, "lws_load_native", 0);
     JS_SetPropertyStr(ctx, ns, "lws_load_native", func);
+
+	lws_set_log_level(LLL_USER | LLL_ERR | LLL_WARN | LLL_NOTICE | LLL_DEBUG, NULL);
 }

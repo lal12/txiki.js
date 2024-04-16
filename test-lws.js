@@ -1,6 +1,5 @@
 const lwsint = tjs[Symbol.for('tjs.internal')].core.lws_load_native();
 
-console.log(lwsint);
 
 /*
 class LWSContext{
@@ -17,10 +16,12 @@ class LWSContext{
 
 const ctx = new lwsint.LWSContext();
 
-console.log(ctx, Object.getPrototypeOf(ctx));
-ctx.add_vhost({ port: 1234, vhost_name: 'default' }, [
+ctx.add_vhost({ port: 1234, vhost_name: 'http' }, [
+	{
+		name: 'defprot'
+	},
     {
-        name: 'http-server',
+        name: 'http',
         callback: ()=>{
             console.log('http-server callback');
         }
@@ -28,8 +29,13 @@ ctx.add_vhost({ port: 1234, vhost_name: 'default' }, [
 ], [
 	{
 		mountpoint: '/',
-		origin: 'http-server',
-		origin_protocol: 6
+		origin: './mount-origin',
+		def: 'index.html',
+		origin_protocol: lwsint.protocol_types.FILE
+	},{
+		mountpoint: '/dyn',
+		protocol: 'http',
+		origin_protocol: lwsint.protocol_types.CALLBACK
 	}
 ]);
 
