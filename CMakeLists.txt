@@ -61,15 +61,17 @@ else()
     option(LWS_WITH_NO_LOGS "" OFF)
 endif()
 set(LWS_WITH_LIBUV ON)
+set(LWS_WITH_EVLIB_PLUGINS OFF)
+set(LWS_WITH_EVENT_LIBS ON)
+set(LWS_WITH_PLUGINS OFF)
 set(LWS_WITH_SERVER ON)
-set(LWS_WITH_SHARED "" OFF)
+set(LWS_WITH_SHARED OFF)
 set(LWS_WITHOUT_CLIENT "" ON) # for now no client part is used, probably will change in the future
-#option(LWS_WITHOUT_TESTAPPS "" ON)
-#option(LWS_WITHOUT_TEST_SERVER "" ON)
+set(LWS_WITHOUT_TESTAPPS "" ON)
+set(LWS_WITHOUT_TEST_SERVER "" ON)
 #option(LWS_WITH_NETLINK "" OFF) # TODO check if this is useful
 #option(LWS_WITH_UDP "" OFF) # TODO check if this is useful
 add_subdirectory(deps/libwebsockets EXCLUDE_FROM_ALL)
-
 
 set(BUILD_WASI "simple" CACHE STRING "WASI implementation")
 add_subdirectory(deps/wasm3 EXCLUDE_FROM_ALL)
