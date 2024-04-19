@@ -4,6 +4,12 @@ project(tjs LANGUAGES C)
 
 include(ExternalProject)
 include(GNUInstallDirs)
+include(FetchContent)
+
+# Avoid warning about DOWNLOAD_EXTRACT_TIMESTAMP in CMake 3.24:
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
+    cmake_policy(SET CMP0135 NEW)
+endif()
 
 if (NOT CMAKE_BUILD_TYPE)
     message(STATUS "No build type selected, default to Release")
@@ -66,6 +72,14 @@ if(BUILD_WITH_MIMALLOC)
     add_subdirectory(deps/mimalloc EXCLUDE_FROM_ALL)
 endif()
 
+FetchContent_Declare(llhttp
+  URL "https://github.com/nodejs/llhttp/archive/refs/tags/release/v8.1.0.tar.gz")
+
+set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
+set(BUILD_STATIC_LIBS ON CACHE INTERNAL "")
+FetchContent_MakeAvailable(llhttp)
+include_directories(${llhttp_SOURCE_DIR}/include)
+
 find_package(CURL REQUIRED)
 
 add_executable(tjs
@@ -79,6 +93,7 @@ add_executable(tjs
     src/ffi.c
     src/fs.c
     src/fswatch.c
+	src/http.c
     src/mem.c
     src/modules.c
     src/os.c
@@ -152,7 +167,7 @@ string(TOLOWER ${CMAKE_SYSTEM_NAME} TJS_PLATFORM)
 target_compile_options(tjs PRIVATE ${tjs_cflags})
 target_compile_definitions(tjs PRIVATE TJS__PLATFORM="${TJS_PLATFORM}")
 target_include_directories(tjs PRIVATE ${CURL_INCLUDE_DIRS})
-target_link_libraries(tjs qjs uv_a m3 sqlite3 m pthread ${CURL_LIBRARIES})
+target_link_libraries(tjs qjs uv_a m3 sqlite3 m pthread ${CURL_LIBRARIES} llhttp_static)
 
 if (BUILD_WITH_MIMALLOC)
     target_compile_definitions(tjs PRIVATE TJS__HAS_MIMALLOC)
